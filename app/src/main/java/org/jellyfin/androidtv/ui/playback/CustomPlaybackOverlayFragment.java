@@ -135,6 +135,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     private final Lazy<NavigationRepository> navigationRepository = inject(NavigationRepository.class);
     private final Lazy<BackgroundService> backgroundService = inject(BackgroundService.class);
     private final Lazy<ImageHelper> imageHelper = inject(ImageHelper.class);
+    private final Lazy<org.jellyfin.androidtv.ui.playback.syncplay.SyncPlayController> syncPlayController = inject(org.jellyfin.androidtv.ui.playback.syncplay.SyncPlayController.class);
 
     private final PlaybackOverlayFragmentHelper helper = new PlaybackOverlayFragmentHelper(this);
 
@@ -160,6 +161,9 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         int mediaPosition = videoQueueManager.getValue().getCurrentMediaPosition();
 
         playbackControllerContainer.getValue().setPlaybackController(new PlaybackController(mItemsToPlay, this, mediaPosition));
+
+        // Attach SyncPlay controller to the playback controller
+        syncPlayController.getValue().attach(playbackControllerContainer.getValue().getPlaybackController());
 
         // setup fade task
         mHideTask = () -> {
@@ -1333,6 +1337,9 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     @Override
     public void onDestroy() {
         super.onDestroy();
+
+        // Detach SyncPlay controller
+        syncPlayController.getValue().detach();
 
         // Show system bars
         WindowCompat.setDecorFitsSystemWindows(requireActivity().getWindow(), true);
