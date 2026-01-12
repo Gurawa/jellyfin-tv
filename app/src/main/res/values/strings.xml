@@ -621,4 +621,18 @@
         <item quantity="one">%1$s album</item>
         <item quantity="other">%1$s albums</item>
     </plurals>
+    <!-- SyncPlay strings -->
+    <string name="syncplay_title">SyncPlay</string>
+    <string name="syncplay_group">Group</string>
+    <string name="syncplay_select_group">Select SyncPlay group</string>
+    <string name="syncplay_create_group">Create new group</string>
+    <string name="syncplay_create_new_group">Create new group…</string>
+    <string name="syncplay_group_name_hint">Enter group name</string>
+    <string name="syncplay_leave_group">Leave SyncPlay group</string>
+    <string name="syncplay_leave_group_message">Do you want to leave the SyncPlay group \"%1$s\"?</string>
+    <string name="syncplay_participants">participants</string>
+    <string name="syncplay_enabled">SyncPlay enabled</string>
+    <string name="syncplay_disabled">SyncPlay disabled</string>
+    <string name="syncplay_waiting">Waiting for others…</string>
+    <string name="syncplay_syncing">Syncing playback…</string>
 </resources>
