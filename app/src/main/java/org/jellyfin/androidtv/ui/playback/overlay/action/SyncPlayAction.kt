@@ -22,7 +22,9 @@ class SyncPlayAction(
 	private val syncPlayManager: SyncPlayManager,
 ) : CustomAction(context, customPlaybackTransportControlGlue) {
 
-	private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+	// Use a dedicated scope for UI operations that ties to the Main dispatcher
+	// These are short-lived operations (network calls) that complete quickly
+	private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
 	init {
 		initializeWithIcon(R.drawable.ic_sync_play)
@@ -51,8 +53,10 @@ class SyncPlayAction(
 			.setTitle(R.string.syncplay_leave_group)
 			.setMessage(context.getString(R.string.syncplay_leave_group_message, groupName))
 			.setPositiveButton(R.string.lbl_yes) { _, _ ->
-				coroutineScope.launch {
-					syncPlayManager.leaveGroup()
+				uiScope.launch {
+					withContext(Dispatchers.IO) {
+						syncPlayManager.leaveGroup()
+					}
 				}
 			}
 			.setNegativeButton(R.string.lbl_cancel, null)
@@ -60,7 +64,7 @@ class SyncPlayAction(
 	}
 
 	private fun showGroupSelectionDialog(context: Context) {
-		coroutineScope.launch {
+		uiScope.launch {
 			val groups = withContext(Dispatchers.IO) {
 				syncPlayManager.getAvailableGroups()
 			}
@@ -87,8 +91,10 @@ class SyncPlayAction(
 				if (which < groups.size) {
 					// Join existing group
 					val selectedGroup = groups[which]
-					coroutineScope.launch {
-						syncPlayManager.joinGroup(selectedGroup.groupId)
+					uiScope.launch {
+						withContext(Dispatchers.IO) {
+							syncPlayManager.joinGroup(selectedGroup.groupId)
+						}
 					}
 				} else {
 					// Create new group
@@ -109,8 +115,10 @@ class SyncPlayAction(
 			.setPositiveButton(R.string.lbl_ok) { _, _ ->
 				val groupName = input.text.toString().trim()
 				if (groupName.isNotEmpty()) {
-					coroutineScope.launch {
-						syncPlayManager.createGroup(groupName)
+					uiScope.launch {
+						withContext(Dispatchers.IO) {
+							syncPlayManager.createGroup(groupName)
+						}
 					}
 				}
 			}

@@ -4,7 +4,9 @@ import android.os.Handler
 import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -19,7 +21,7 @@ import java.time.Instant
 class SyncPlayController(
 	private val syncPlayManager: SyncPlayManager,
 ) {
-	private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+	private var coroutineScope: CoroutineScope? = null
 	private val mainHandler = Handler(Looper.getMainLooper())
 
 	private var playbackController: PlaybackController? = null
@@ -29,6 +31,10 @@ class SyncPlayController(
 	 * Attach this controller to a PlaybackController.
 	 */
 	fun attach(controller: PlaybackController) {
+		// Cancel any existing scope before creating a new one
+		coroutineScope?.cancel()
+		coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
 		playbackController = controller
 		isActive = true
 
@@ -40,7 +46,7 @@ class SyncPlayController(
 		// Observe SyncPlay enabled state
 		syncPlayManager.isEnabled.onEach { enabled ->
 			Timber.d("SyncPlay enabled state changed: $enabled")
-		}.launchIn(coroutineScope)
+		}.launchIn(coroutineScope!!)
 	}
 
 	/**
@@ -50,6 +56,8 @@ class SyncPlayController(
 		isActive = false
 		syncPlayManager.onPlaybackCommand = null
 		playbackController = null
+		coroutineScope?.cancel()
+		coroutineScope = null
 	}
 
 	private fun handleCommand(command: SyncPlayCommand) {
@@ -57,6 +65,9 @@ class SyncPlayController(
 		if (!isActive) return
 
 		mainHandler.post {
+			// Recheck the state after post to ensure consistency
+			if (!isActive || playbackController == null) return@post
+
 			when (command) {
 				is SyncPlayCommand.Unpause -> handleUnpause(controller, command)
 				is SyncPlayCommand.Pause -> handlePause(controller, command)
@@ -78,9 +89,11 @@ class SyncPlayController(
 			// Schedule the play action for the target time
 			val targetPosition = command.positionTicks?.div(10000) ?: controller.currentPosition
 			mainHandler.postDelayed({
-				if (isActive && playbackController != null) {
-					if (controller.isPaused) {
-						controller.play(targetPosition)
+				// Recheck controller reference at execution time
+				val currentController = playbackController
+				if (isActive && currentController != null) {
+					if (currentController.isPaused) {
+						currentController.play(targetPosition)
 					}
 				}
 			}, delay)
@@ -109,13 +122,15 @@ class SyncPlayController(
 		if (delay > 0) {
 			// Schedule the pause action for the target time
 			mainHandler.postDelayed({
-				if (isActive && playbackController != null) {
-					if (controller.isPlaying) {
-						controller.pause()
+				// Recheck controller reference at execution time
+				val currentController = playbackController
+				if (isActive && currentController != null) {
+					if (currentController.isPlaying) {
+						currentController.pause()
 					}
 					// Seek to the exact position after pausing
 					command.positionTicks?.let { ticks ->
-						controller.seek(ticks / 10000)
+						currentController.seek(ticks / 10000)
 					}
 				}
 			}, delay)
@@ -148,7 +163,7 @@ class SyncPlayController(
 	fun notifyPlayPause() {
 		if (!syncPlayManager.isEnabled.value) return
 
-		coroutineScope.launch(Dispatchers.IO) {
+		coroutineScope?.launch(Dispatchers.IO) {
 			val controller = playbackController ?: return@launch
 			if (controller.isPlaying) {
 				syncPlayManager.requestPause()
@@ -161,7 +176,7 @@ class SyncPlayController(
 	fun notifySeek(positionMs: Long) {
 		if (!syncPlayManager.isEnabled.value) return
 
-		coroutineScope.launch(Dispatchers.IO) {
+		coroutineScope?.launch(Dispatchers.IO) {
 			syncPlayManager.requestSeek(positionMs * 10000)
 		}
 	}
@@ -169,7 +184,7 @@ class SyncPlayController(
 	fun notifyStop() {
 		if (!syncPlayManager.isEnabled.value) return
 
-		coroutineScope.launch(Dispatchers.IO) {
+		coroutineScope?.launch(Dispatchers.IO) {
 			syncPlayManager.requestStop()
 		}
 	}
